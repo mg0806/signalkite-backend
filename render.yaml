@@ -7,8 +7,8 @@ services:
   - type: web
     name: signalkite-api
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     healthCheckPath: /health
     envVars:
@@ -58,8 +58,8 @@ services:
   - type: worker
     name: signalkite-rq-worker
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     dockerCommand: python rq_worker.py
     envVars:
@@ -107,8 +107,8 @@ services:
   - type: worker
     name: signalkite-worker
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
     plan: free
     dockerCommand: python worker.py
     envVars:
