@@ -1,0 +1,13 @@
+backend/.env
+backend/.venv/
+backend/signalkite.db
+backend/**/__pycache__/
+backend/**/*.pyc
+backend/.pytest_cache/
+backend/*.log
+*.log
+notification-gateway/node_modules/
+notification-gateway/.env
+notification-gateway/npm-debug.log*
+dist/
+build/

@@ -1,0 +1,147 @@
+databases:
+  - name: signalkite-postgres
+    databaseName: signalkite
+    user: signalkite
+
+services:
+  - type: web
+    name: signalkite-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: signalkite-postgres
+          property: connectionString
+      - key: DB_AUTO_CREATE
+        value: false
+      - key: SCHEDULER_ENABLED
+        value: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: KITE_API_KEY
+        sync: false
+      - key: KITE_API_SECRET
+        sync: false
+      - key: KITE_REDIRECT_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: BROKER_TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: RATE_LIMIT_PER_MINUTE
+        value: 120
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: EMAIL_WEBHOOK_URL
+        sync: false
+      - key: ALERT_EMAIL_TO
+        sync: false
+      - key: TEXTLOCAL_API_KEY
+        sync: false
+      - key: TEXTLOCAL_SENDER
+        value: TXTLCL
+      - key: ALERT_PHONE_TO
+        sync: false
+      - key: OLLAMA_BASE_URL
+        sync: false
+      - key: OLLAMA_MODEL
+        value: llama3.1
+
+  - type: worker
+    name: signalkite-rq-worker
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    dockerCommand: python rq_worker.py
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: signalkite-postgres
+          property: connectionString
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: signalkite-api
+          envVarKey: JWT_SECRET
+      - key: BROKER_TOKEN_ENCRYPTION_KEY
+        fromService:
+          type: web
+          name: signalkite-api
+          envVarKey: BROKER_TOKEN_ENCRYPTION_KEY
+
+  - type: web
+    name: signalkite-mailer
+    runtime: node
+    rootDir: notification-gateway
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run start
+    healthCheckPath: /health
+    envVars:
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_SECURE
+        value: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+
+  - type: worker
+    name: signalkite-worker
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    dockerCommand: python worker.py
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: signalkite-postgres
+          property: connectionString
+      - key: KITE_API_KEY
+        sync: false
+      - key: KITE_API_SECRET
+        sync: false
+      - key: JWT_SECRET
+        fromService:
+          type: web
+          name: signalkite-api
+          envVarKey: JWT_SECRET
+      - key: SCHEDULER_ENABLED
+        value: false
+      - key: WORKER_POLL_SECONDS
+        value: 300
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: EMAIL_WEBHOOK_URL
+        sync: false
+      - key: ALERT_EMAIL_TO
+        sync: false
+      - key: TEXTLOCAL_API_KEY
+        sync: false
+      - key: TEXTLOCAL_SENDER
+        value: TXTLCL
+      - key: ALERT_PHONE_TO
+        sync: false
