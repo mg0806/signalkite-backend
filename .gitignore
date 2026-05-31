@@ -1,6 +1,7 @@
 backend/.env
 backend/.venv/
 backend/signalkite.db
+backend/ci*.db
 backend/**/__pycache__/
 backend/**/*.pyc
 backend/.pytest_cache/
