@@ -23,6 +23,7 @@ jobs:
       - run: pytest -q
         env:
           DATABASE_URL: sqlite:///./ci.db
+          PYTHONPATH: .
 
   notification-gateway:
     runs-on: ubuntu-latest
