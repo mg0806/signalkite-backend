@@ -65,22 +65,26 @@ def refresh_holdings_prices(db: Session, user: User) -> dict:
     seen_symbols: set[str] = set()
     quote_keys = [f"{row.get('exchange', 'NSE')}:{row['tradingsymbol']}" for row in rows]
     quotes = {}
+    quote_errors: list[str] = []
     if quote_keys:
         try:
             quotes = kite.quote(quote_keys)
-        except Exception:
+        except Exception as exc:
+            quote_errors.append(f"quote batch: {exc}")
             logger.exception("Batch quote refresh failed for user_id=%s", user.id)
             for key in quote_keys:
                 try:
                     quotes.update(kite.quote([key]))
-                except Exception:
+                except Exception as item_exc:
+                    quote_errors.append(f"quote {key}: {item_exc}")
                     logger.exception("Quote refresh failed for user_id=%s instrument=%s", user.id, key)
 
     missing_keys = [key for key in quote_keys if key not in quotes]
     if missing_keys:
         try:
             quotes.update(kite.ltp(missing_keys))
-        except Exception:
+        except Exception as exc:
+            quote_errors.append(f"ltp fallback: {exc}")
             logger.exception("LTP fallback refresh failed for user_id=%s", user.id)
 
     for row in rows:
@@ -127,6 +131,7 @@ def refresh_holdings_prices(db: Session, user: User) -> dict:
         "holdings_count": len(rows),
         "quote_count": len([key for key in quote_keys if key in quotes]),
         "missing_quote_count": len([key for key in quote_keys if key not in quotes]),
+        "quote_errors": quote_errors[:5],
     }
 
 

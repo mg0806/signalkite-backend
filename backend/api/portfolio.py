@@ -62,11 +62,13 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
     user = get_demo_user(db)
     refresh_status = "live"
     refresh_error = None
-    refresh_stats = {"holdings_count": 0, "quote_count": 0, "missing_quote_count": 0}
+    refresh_stats = {"holdings_count": 0, "quote_count": 0, "missing_quote_count": 0, "quote_errors": []}
     try:
         refresh_stats = refresh_holdings_prices(db, user)
         if refresh_stats["holdings_count"] and not refresh_stats["quote_count"]:
             refresh_status = "holdings_snapshot"
+            if refresh_stats.get("quote_errors"):
+                refresh_error = "; ".join(refresh_stats["quote_errors"][:2])
         elif refresh_stats["missing_quote_count"]:
             refresh_status = "partial_live"
     except Exception as exc:
