@@ -75,12 +75,15 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
     total_value = 0.0
     total_pnl = 0.0
     active_signals = 0
+    last_updated = None
 
     for holding in holdings:
         signal = latest_signal(db, user.id, holding.tradingsymbol)
         target_price = calculated_target_price(holding, signal, watchlist_targets.get(holding.tradingsymbol))
         total_value += holding.quantity * holding.last_price
         total_pnl += holding.pnl
+        if last_updated is None or holding.synced_at > last_updated:
+            last_updated = holding.synced_at
         if signal and signal.signal_type != "HOLD":
             active_signals += 1
         items.append(
@@ -92,6 +95,7 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
                 "last_price": holding.last_price,
                 "target_price": target_price,
                 "pnl": holding.pnl,
+                "synced_at": holding.synced_at,
                 "sparkline": [],
                 "signal": None
                 if signal is None
@@ -115,6 +119,7 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
             "overall_gain": total_pnl,
             "xirr": None,
             "active_signals": active_signals,
+            "last_updated": last_updated,
         },
         "holdings": items,
     }
