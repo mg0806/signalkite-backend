@@ -30,6 +30,12 @@ services:
         sync: false
       - key: KITE_REDIRECT_URL
         sync: false
+      - key: UPSTOX_API_KEY
+        sync: false
+      - key: UPSTOX_API_SECRET
+        sync: false
+      - key: UPSTOX_REDIRECT_URL
+        sync: false
       - key: JWT_SECRET
         generateValue: true
       - key: BROKER_TOKEN_ENCRYPTION_KEY

@@ -6,6 +6,7 @@ from api.portfolio import router as portfolio_router
 from api.market import router as market_router
 from api.wealth import router as wealth_router
 from auth.kite import router as kite_router
+from auth.upstox import router as upstox_router
 from auth.security import set_current_user_context
 from config import settings
 from db import init_db
@@ -26,10 +27,12 @@ app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
 app.include_router(kite_router)
+app.include_router(upstox_router)
 app.include_router(market_router)
 app.include_router(portfolio_router, dependencies=[Depends(set_current_user_context)])
 app.include_router(wealth_router, dependencies=[Depends(set_current_user_context)])
 app.include_router(kite_router, prefix="/api/v1")
+app.include_router(upstox_router, prefix="/api/v1")
 app.include_router(market_router, prefix="/api/v1")
 app.include_router(portfolio_router, prefix="/api/v1", dependencies=[Depends(set_current_user_context)])
 app.include_router(wealth_router, prefix="/api/v1", dependencies=[Depends(set_current_user_context)])
