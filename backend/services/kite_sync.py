@@ -64,7 +64,17 @@ def refresh_holdings_prices(db: Session, user: User) -> list[Holding]:
     refreshed: list[Holding] = []
     seen_symbols: set[str] = set()
     quote_keys = [f"{row.get('exchange', 'NSE')}:{row['tradingsymbol']}" for row in rows]
-    quotes = kite.quote(quote_keys) if quote_keys else {}
+    quotes = {}
+    if quote_keys:
+        try:
+            quotes = kite.quote(quote_keys)
+        except Exception:
+            logger.exception("Batch quote refresh failed for user_id=%s", user.id)
+            for key in quote_keys:
+                try:
+                    quotes.update(kite.quote([key]))
+                except Exception:
+                    logger.exception("Quote refresh failed for user_id=%s instrument=%s", user.id, key)
 
     for row in rows:
         symbol = row["tradingsymbol"]

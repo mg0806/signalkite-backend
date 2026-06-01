@@ -60,10 +60,14 @@ def calculated_target_price(holding: Holding, signal: Signal | None, configured_
 @router.get("/portfolio")
 def portfolio(db: Session = Depends(get_db)) -> dict:
     user = get_demo_user(db)
+    refresh_status = "live"
+    refresh_error = None
     try:
         refresh_holdings_prices(db, user)
-    except Exception:
+    except Exception as exc:
         db.rollback()
+        refresh_status = "stale"
+        refresh_error = str(exc)
     holdings = db.query(Holding).filter(Holding.user_id == user.id).order_by(Holding.tradingsymbol).all()
     watchlist_targets = {
         row.tradingsymbol: row.target_price
@@ -120,6 +124,8 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
             "xirr": None,
             "active_signals": active_signals,
             "last_updated": last_updated,
+            "refresh_status": refresh_status,
+            "refresh_error": refresh_error,
         },
         "holdings": items,
     }
