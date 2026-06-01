@@ -63,9 +63,16 @@ def refresh_holdings_prices(db: Session, user: User) -> list[Holding]:
     rows = kite.holdings()
     refreshed: list[Holding] = []
     seen_symbols: set[str] = set()
+    quote_keys = [f"{row.get('exchange', 'NSE')}:{row['tradingsymbol']}" for row in rows]
+    quotes = kite.quote(quote_keys) if quote_keys else {}
 
     for row in rows:
         symbol = row["tradingsymbol"]
+        exchange = row.get("exchange", "NSE")
+        quote = quotes.get(f"{exchange}:{symbol}", {})
+        last_price = float(quote.get("last_price") or row.get("last_price", 0))
+        average_price = float(row.get("average_price", 0))
+        quantity = int(row.get("quantity", 0))
         seen_symbols.add(symbol)
         holding = (
             db.query(Holding)
@@ -76,11 +83,11 @@ def refresh_holdings_prices(db: Session, user: User) -> list[Holding]:
             holding = Holding(user_id=user.id, tradingsymbol=symbol)
             db.add(holding)
 
-        holding.exchange = row.get("exchange", "NSE")
-        holding.quantity = int(row.get("quantity", 0))
-        holding.average_price = float(row.get("average_price", 0))
-        holding.last_price = float(row.get("last_price", 0))
-        holding.pnl = float(row.get("pnl", 0))
+        holding.exchange = exchange
+        holding.quantity = quantity
+        holding.average_price = average_price
+        holding.last_price = last_price
+        holding.pnl = (last_price - average_price) * quantity
         holding.synced_at = datetime.utcnow()
         refreshed.append(holding)
 

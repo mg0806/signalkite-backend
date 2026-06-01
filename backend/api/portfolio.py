@@ -39,6 +39,24 @@ def latest_signal(db: Session, user_id: int, symbol: str) -> Signal | None:
     )
 
 
+def calculated_target_price(holding: Holding, signal: Signal | None, configured_target: float | None) -> float:
+    if configured_target is not None and configured_target > 0:
+        return round(configured_target, 2)
+
+    last_price = max(float(holding.last_price or 0), 0)
+    average_price = max(float(holding.average_price or 0), 0)
+    signal_type = signal.signal_type if signal is not None else "HOLD"
+
+    if signal_type == "BUY":
+        target = last_price * 1.05
+    elif signal_type == "SELL":
+        target = min(last_price, average_price) * 0.98
+    else:
+        target = max(last_price * 1.03, average_price * 1.02)
+
+    return round(target, 2)
+
+
 @router.get("/portfolio")
 def portfolio(db: Session = Depends(get_db)) -> dict:
     user = get_demo_user(db)
@@ -60,6 +78,7 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
 
     for holding in holdings:
         signal = latest_signal(db, user.id, holding.tradingsymbol)
+        target_price = calculated_target_price(holding, signal, watchlist_targets.get(holding.tradingsymbol))
         total_value += holding.quantity * holding.last_price
         total_pnl += holding.pnl
         if signal and signal.signal_type != "HOLD":
@@ -71,7 +90,7 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
                 "quantity": holding.quantity,
                 "average_price": holding.average_price,
                 "last_price": holding.last_price,
-                "target_price": watchlist_targets.get(holding.tradingsymbol),
+                "target_price": target_price,
                 "pnl": holding.pnl,
                 "sparkline": [],
                 "signal": None
