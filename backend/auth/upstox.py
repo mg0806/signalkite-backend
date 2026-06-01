@@ -29,7 +29,7 @@ def status() -> dict[str, bool]:
 
 
 @router.get("/login")
-def login() -> RedirectResponse | HTMLResponse:
+def login():
     if not upstox_configured():
         return HTMLResponse(
             """
