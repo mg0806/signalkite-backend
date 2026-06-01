@@ -11,6 +11,7 @@ from config import settings
 from db import get_db
 from models import User
 from services.crypto import decrypt_secret, encrypt_secret
+from services.upstox_stream import get_upstox_stream_status
 
 router = APIRouter(prefix="/auth/upstox", tags=["upstox-auth"])
 
@@ -119,3 +120,10 @@ def holdings(user: User = Depends(get_current_user)) -> dict:
     if response.status_code >= 400:
         raise HTTPException(status_code=response.status_code, detail=response.text)
     return response.json()
+
+
+@router.get("/stream/status")
+def stream_status(user: User = Depends(get_current_user)) -> dict:
+    if not user.kite_user_id.startswith("upstox:"):
+        raise HTTPException(status_code=400, detail="Current token is not an Upstox session")
+    return get_upstox_stream_status(user.id)

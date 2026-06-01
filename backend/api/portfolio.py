@@ -13,6 +13,7 @@ from services.instruments import resolve_instrument_token
 from services.kite_sync import authenticated_kite, refresh_holdings_prices
 from services.market_scanner import scan_market_top_picks
 from services.screener import fetch_screener_snapshot
+from services.upstox_stream import sync_upstox_holdings_with_ticks
 
 router = APIRouter(tags=["portfolio"])
 
@@ -64,13 +65,21 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
     refresh_error = None
     refresh_stats = {"holdings_count": 0, "quote_count": 0, "missing_quote_count": 0, "quote_errors": []}
     try:
-        refresh_stats = refresh_holdings_prices(db, user)
-        if refresh_stats["holdings_count"] and not refresh_stats["quote_count"]:
-            refresh_status = "holdings_snapshot"
-            if refresh_stats.get("quote_errors"):
-                refresh_error = "; ".join(refresh_stats["quote_errors"][:2])
-        elif refresh_stats["missing_quote_count"]:
-            refresh_status = "partial_live"
+        if user.kite_user_id.startswith("upstox:"):
+            refresh_stats = sync_upstox_holdings_with_ticks(db, user)
+            if refresh_stats["quote_count"]:
+                refresh_status = "upstox_stream"
+            else:
+                refresh_status = "upstox_stream_starting"
+                refresh_error = refresh_stats.get("stream_error")
+        else:
+            refresh_stats = refresh_holdings_prices(db, user)
+            if refresh_stats["holdings_count"] and not refresh_stats["quote_count"]:
+                refresh_status = "holdings_snapshot"
+                if refresh_stats.get("quote_errors"):
+                    refresh_error = "; ".join(refresh_stats["quote_errors"][:2])
+            elif refresh_stats["missing_quote_count"]:
+                refresh_status = "partial_live"
     except Exception as exc:
         db.rollback()
         refresh_status = "stale"
