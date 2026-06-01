@@ -58,6 +58,47 @@ def sync_holdings(db: Session, user: User) -> list[Holding]:
     return synced
 
 
+def refresh_holdings_prices(db: Session, user: User) -> list[Holding]:
+    kite = authenticated_kite(user)
+    rows = kite.holdings()
+    refreshed: list[Holding] = []
+    seen_symbols: set[str] = set()
+
+    for row in rows:
+        symbol = row["tradingsymbol"]
+        seen_symbols.add(symbol)
+        holding = (
+            db.query(Holding)
+            .filter(Holding.user_id == user.id, Holding.tradingsymbol == symbol)
+            .one_or_none()
+        )
+        if holding is None:
+            holding = Holding(user_id=user.id, tradingsymbol=symbol)
+            db.add(holding)
+
+        holding.exchange = row.get("exchange", "NSE")
+        holding.quantity = int(row.get("quantity", 0))
+        holding.average_price = float(row.get("average_price", 0))
+        holding.last_price = float(row.get("last_price", 0))
+        holding.pnl = float(row.get("pnl", 0))
+        holding.synced_at = datetime.utcnow()
+        refreshed.append(holding)
+
+    if seen_symbols:
+        stale_holdings = (
+            db.query(Holding)
+            .filter(Holding.user_id == user.id, Holding.tradingsymbol.notin_(seen_symbols))
+            .all()
+        )
+        for holding in stale_holdings:
+            db.delete(holding)
+
+    db.commit()
+    for holding in refreshed:
+        db.refresh(holding)
+    return refreshed
+
+
 def sync_all_users(db: Session) -> None:
     for user in db.query(User).all():
         try:

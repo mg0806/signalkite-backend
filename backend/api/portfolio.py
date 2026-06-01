@@ -7,10 +7,10 @@ from sqlalchemy.orm import Session
 from auth.security import current_user_context
 from config import settings
 from db import get_db
-from models import Holding, Signal, User
+from models import Holding, Signal, User, WatchlistItem
 from services.historical_data import fetch_ohlcv
 from services.instruments import resolve_instrument_token
-from services.kite_sync import authenticated_kite
+from services.kite_sync import authenticated_kite, refresh_holdings_prices
 from services.market_scanner import scan_market_top_picks
 from services.screener import fetch_screener_snapshot
 
@@ -42,7 +42,17 @@ def latest_signal(db: Session, user_id: int, symbol: str) -> Signal | None:
 @router.get("/portfolio")
 def portfolio(db: Session = Depends(get_db)) -> dict:
     user = get_demo_user(db)
+    try:
+        refresh_holdings_prices(db, user)
+    except Exception:
+        db.rollback()
     holdings = db.query(Holding).filter(Holding.user_id == user.id).order_by(Holding.tradingsymbol).all()
+    watchlist_targets = {
+        row.tradingsymbol: row.target_price
+        for row in db.query(WatchlistItem)
+        .filter(WatchlistItem.user_id == user.id, WatchlistItem.target_price.isnot(None))
+        .all()
+    }
     items = []
     total_value = 0.0
     total_pnl = 0.0
@@ -61,6 +71,7 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
                 "quantity": holding.quantity,
                 "average_price": holding.average_price,
                 "last_price": holding.last_price,
+                "target_price": watchlist_targets.get(holding.tradingsymbol),
                 "pnl": holding.pnl,
                 "sparkline": [],
                 "signal": None
