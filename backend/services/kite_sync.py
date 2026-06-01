@@ -58,7 +58,7 @@ def sync_holdings(db: Session, user: User) -> list[Holding]:
     return synced
 
 
-def refresh_holdings_prices(db: Session, user: User) -> list[Holding]:
+def refresh_holdings_prices(db: Session, user: User) -> dict:
     kite = authenticated_kite(user)
     rows = kite.holdings()
     refreshed: list[Holding] = []
@@ -76,13 +76,23 @@ def refresh_holdings_prices(db: Session, user: User) -> list[Holding]:
                 except Exception:
                     logger.exception("Quote refresh failed for user_id=%s instrument=%s", user.id, key)
 
+    missing_keys = [key for key in quote_keys if key not in quotes]
+    if missing_keys:
+        try:
+            quotes.update(kite.ltp(missing_keys))
+        except Exception:
+            logger.exception("LTP fallback refresh failed for user_id=%s", user.id)
+
     for row in rows:
         symbol = row["tradingsymbol"]
         exchange = row.get("exchange", "NSE")
-        quote = quotes.get(f"{exchange}:{symbol}", {})
-        last_price = float(quote.get("last_price") or row.get("last_price", 0))
+        quote_key = f"{exchange}:{symbol}"
+        quote = quotes.get(quote_key, {})
+        quote_price = quote.get("last_price")
+        last_price = float(quote_price or row.get("last_price", 0))
         average_price = float(row.get("average_price", 0))
         quantity = int(row.get("quantity", 0))
+        row_pnl = float(row.get("pnl", 0))
         seen_symbols.add(symbol)
         holding = (
             db.query(Holding)
@@ -97,7 +107,7 @@ def refresh_holdings_prices(db: Session, user: User) -> list[Holding]:
         holding.quantity = quantity
         holding.average_price = average_price
         holding.last_price = last_price
-        holding.pnl = (last_price - average_price) * quantity
+        holding.pnl = (last_price - average_price) * quantity if quote_price else row_pnl
         holding.synced_at = datetime.utcnow()
         refreshed.append(holding)
 
@@ -113,7 +123,11 @@ def refresh_holdings_prices(db: Session, user: User) -> list[Holding]:
     db.commit()
     for holding in refreshed:
         db.refresh(holding)
-    return refreshed
+    return {
+        "holdings_count": len(rows),
+        "quote_count": len([key for key in quote_keys if key in quotes]),
+        "missing_quote_count": len([key for key in quote_keys if key not in quotes]),
+    }
 
 
 def sync_all_users(db: Session) -> None:

@@ -62,8 +62,13 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
     user = get_demo_user(db)
     refresh_status = "live"
     refresh_error = None
+    refresh_stats = {"holdings_count": 0, "quote_count": 0, "missing_quote_count": 0}
     try:
-        refresh_holdings_prices(db, user)
+        refresh_stats = refresh_holdings_prices(db, user)
+        if refresh_stats["holdings_count"] and not refresh_stats["quote_count"]:
+            refresh_status = "holdings_snapshot"
+        elif refresh_stats["missing_quote_count"]:
+            refresh_status = "partial_live"
     except Exception as exc:
         db.rollback()
         refresh_status = "stale"
@@ -126,6 +131,7 @@ def portfolio(db: Session = Depends(get_db)) -> dict:
             "last_updated": last_updated,
             "refresh_status": refresh_status,
             "refresh_error": refresh_error,
+            "refresh_stats": refresh_stats,
         },
         "holdings": items,
     }
